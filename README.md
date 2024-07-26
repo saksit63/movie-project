@@ -2,7 +2,7 @@
 
 Technology used: *Python, PySpark, Apache Airflow, Docker,Google Cloud Dataproc, Google Cloud Storage, Google Cloud Bigquery, Google Looker Studio*
 
-![Data Pipeline Diagram](https://github.com/saksit63/movie-project/blob/main/img/movie_workflow.png)
+
 
 ## Process
  1. นำข้อมูลการแสดงความคิดของลูกค้าจากไฟล์ CSV และข้อมูลการซื้อขายจากฐานข้อมูล MySQL ไปยัง Google Cloud Storage (GCS)
