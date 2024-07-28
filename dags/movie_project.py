@@ -35,7 +35,7 @@ BUCKET_NAME_CLUSTER = "dataproc-cluster-saksit"
 
 #warehours
 PROJECT_ID = "ornate-chemist-425808-e2"
-DATASET_NAME = "movies_project"
+DATASET_NAME = "movie_project"
 
 cluster_generator_config = ClusterGenerator(
     project_id=PROJECT_ID,
@@ -65,19 +65,15 @@ default_args = {
     'depends_on_past': False,
     'catchup': False,
     'start_date': days_ago(1),
-    'email': ['saksit_ch@kkumail.com'],
-    'email_on_failure': False,
-    'email_on_retry': False,
-    'execution_timeout': timedelta(minutes=30),
     'retries': 1,
-    'retry_delay': timedelta(minutes=2)
+    'retry_delay': timedelta(minutes=5)
 }
 
 with DAG(
-    dag_id='movies_pipeline',
+    dag_id='movie_pipeline',
     default_args=default_args, 
-    schedule_interval=None, 
-    tags=['movies', 'project']
+    schedule_interval="@daily", 
+    tags=['project', 'movies']
 ) as dag:
 
     create_bucket = GCSCreateBucketOperator(
@@ -89,16 +85,16 @@ with DAG(
 
     upload_movie_review_to_gcs = LocalFilesystemToGCSOperator(
         task_id = 'upload_movie_review_to_gcs',
-        src="/home/airflow/dataset/movie_review.csv", #พาธที่อ้างอิงไปยังไฟล์ที่ต้องการย้ายจาก Local filesystem
-        dst='raw/movie_review.csv', #ชื่อของ Object ใน Google Cloud Storage ที่ต้องการเก็บไฟล์
-        bucket= GCP_BUCKET_NAME, #คือชื่อ Bucket ที่ต้องการให้ไฟล์ถูกบันทึกใน GCS
-        gcp_conn_id="gcp", #ชื่อของ Connection ID
-        mime_type="text/csv" #ระบุประเภทไฟล์
+        src="/home/airflow/dataset/movie_review.csv",
+        dst='raw/movie_review.csv',
+        bucket= GCP_BUCKET_NAME,
+        gcp_conn_id="gcp",
+        mime_type="text/csv"
     )
 
     user_purchase_mysql_to_gcs = MySQLToGCSOperator(
         task_id = "user_purchase_mysql_to_gcs",
-        sql="SELECT * FROM movies.user_purchase LIMIT 200000;",
+        sql="SELECT * FROM movies.user_purchase;",
         bucket=GCP_BUCKET_NAME,
         filename='raw/user_purchase/user_purchase.csv',
         schema_filename="None",
@@ -154,11 +150,6 @@ with DAG(
         bucket=GCP_BUCKET_NAME,
         source_objects=['clean/movie_review.parquet'],
         destination_project_dataset_table=f'{DATASET_NAME}.{TABLE_NAME}',
-        # schema_fields=[
-        #     {"name":"customer_id", 'type': 'STRING'},
-        #     {"name":"positive_review", 'type': 'BOOLEAN'},
-        #     {"name":"insert_date", 'type': 'DATETIME'}
-        # ],
         source_format="PARQUET",
         gcp_conn_id="gcp",
         skip_leading_rows=0,
@@ -171,16 +162,6 @@ with DAG(
         bucket=GCP_BUCKET_NAME,
         source_objects=['raw/user_purchase/user_purchase.csv'],
         destination_project_dataset_table=f'{DATASET_NAME}.{TABLE_NAME}',
-        # schema_fields=[
-        #     {"name":"invoice_id", 'type': 'STRING'},
-        #     {"name":"stock_id", 'type': 'STRING'},
-        #     {"name":"description", 'type': 'STRING'},
-        #     {"name":"quantity", 'type': 'INTEGER'},
-        #     {"name":"invoice_date", 'type': 'DATETIME'},
-        #     {"name":"unit_price", 'type': 'FLOAT'},
-        #     {"name":"customer_id", 'type': 'INTEGER'},
-        #     {"name":"country", 'type': 'STRING'}
-        # ],
         source_format="CSV",
         write_disposition="WRITE_TRUNCATE",
         gcp_conn_id="gcp",
@@ -188,13 +169,6 @@ with DAG(
     )
 
     q = f"""
-        WITH user_purchase AS (
-            SELECT * FROM {PROJECT_ID}.{DATASET_NAME}.user_purchase
-        ),
-        movie_review AS (
-            SELECT * FROM {PROJECT_ID}.{DATASET_NAME}.movie_review
-        )
-
         CREATE OR REPLACE VIEW {PROJECT_ID}.{DATASET_NAME}.customer_reviews AS
             SELECT
                 up.CustomerID,
@@ -203,8 +177,8 @@ with DAG(
                     when mr.positive_review then 1 else 0
                     end) as num_positive_reviews,
                 count(mr.cid) as num_reviews
-            FROM user_purchase up
-            JOIN movie_review mr ON up.CustomerID = mr.cid
+            FROM {PROJECT_ID}.{DATASET_NAME}.user_purchase up
+            JOIN {PROJECT_ID}.{DATASET_NAME}.movie_review mr ON up.CustomerID = mr.cid
             GROUP BY up.CustomerID
             ORDER BY amount_spent
     """
@@ -215,9 +189,9 @@ with DAG(
             "query": {
                 "query": q,
                 "useLegacySql": False,
-                "writeDisposition":"WRITE_TRUNCATE"
             }
         },
+        location='US',
         gcp_conn_id="gcp"
     )
 
