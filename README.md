@@ -20,9 +20,14 @@ PySpark file: [pyspark_script.py](https://github.com/saksit63/movie-project/blob
 ## Result
 Airflow:
 
+![Airlofw](https://github.com/saksit63/movie-project/blob/main/result/airflow_task_run.png)
 
 Bigquery:
 
 ![Bigquery](https://github.com/saksit63/movie-project/blob/main/result/bigquery.png)
 
 Dashbord: 
+
+![Dashboard](https://github.com/saksit63/movie-project/blob/main/result/movie_dashboard.png)
+
+
