@@ -20,7 +20,7 @@ PySpark file: [pyspark_script.py](https://github.com/saksit63/movie-project/blob
 ## Result
 Airflow:
 
-![Airlofw](https://github.com/saksit63/movie-project/blob/main/result/airflow_task_run.png)
+![Airlofw](https://github.com/saksit63/movie-project/blob/main/result/airflow_dag.png)
 
 Bigquery:
 
