@@ -1,10 +1,7 @@
-#gcloud compute scp ~/Airflow/dags/movies.py instance-20240719-155639:~/Airflow/ --project=ornate-chemist-425808-e2 --zone=us-central1-c
 import time
 from airflow import DAG
 from datetime import timedelta, datetime
 from airflow.utils.dates import days_ago
-from airflow.operators.bash_operator import BashOperator
-from airflow.operators.python_operator import PythonOperator
 from airflow.utils.task_group import TaskGroup
 from airflow.providers.google.cloud.transfers.gcs_to_bigquery import GCSToBigQueryOperator
 from airflow.providers.google.cloud.transfers.local_to_gcs import LocalFilesystemToGCSOperator
@@ -73,7 +70,7 @@ with DAG(
     dag_id='movie_pipeline',
     default_args=default_args, 
     schedule_interval="@daily", 
-    tags=['project', 'movies']
+    tags=['project', 'movie']
 ) as dag:
 
     create_bucket = GCSCreateBucketOperator(
@@ -94,7 +91,7 @@ with DAG(
 
     user_purchase_mysql_to_gcs = MySQLToGCSOperator(
         task_id = "user_purchase_mysql_to_gcs",
-        sql="SELECT * FROM movies.user_purchase;",
+        sql="SELECT * FROM movie.user_purchase;",
         bucket=GCP_BUCKET_NAME,
         filename='raw/user_purchase/user_purchase.csv',
         schema_filename="None",
@@ -137,8 +134,8 @@ with DAG(
         task_group = task_group_dataproc
     )
 
-    create_movies_dataset = BigQueryCreateEmptyDatasetOperator(
-        task_id = 'create_retail_dataset',
+    create_movie_dataset = BigQueryCreateEmptyDatasetOperator(
+        task_id = 'create_movie_dataset',
         dataset_id = DATASET_NAME,
         exists_ok=True,
         gcp_conn_id="gcp"
@@ -169,18 +166,38 @@ with DAG(
     )
 
     q = f"""
-        CREATE OR REPLACE VIEW {PROJECT_ID}.{DATASET_NAME}.customer_reviews AS
+        CREATE OR REPLACE VIEW `{DATASET_NAME}.customer_reviews` AS
+            WITH up AS(
+                SELECT 
+                    CustomerID AS customer_id,
+                    Country AS country,
+                    SUM(Quantity * UnitPrice) AS amount_spent
+                FROM
+                    `{DATASET_NAME}.user_purchase`
+                GROUP BY 1, 2
+                ),
+
+            mr AS(
+                SELECT 
+                    cid AS customer_id,
+                    SUM(CASE
+                            WHEN positive_review = true THEN 1 ELSE 0
+                        END) AS num_positive_reviews,
+                    COUNT(cid) AS num_reviews
+                FROM 
+                    `{DATASET_NAME}.movie_review`
+                GROUP BY 1
+                )
+
             SELECT
-                up.CustomerID,
-                sum(up.Quantity * up.UnitPrice) as amount_spent,
-                sum(case
-                    when mr.positive_review then 1 else 0
-                    end) as num_positive_reviews,
-                count(mr.cid) as num_reviews
-            FROM {PROJECT_ID}.{DATASET_NAME}.user_purchase up
-            JOIN {PROJECT_ID}.{DATASET_NAME}.movie_review mr ON up.CustomerID = mr.cid
-            GROUP BY up.CustomerID
-            ORDER BY amount_spent
+                up.customer_id,
+                up.country,
+                up.amount_spent,
+                mr.num_positive_reviews,
+                mr.num_reviews
+            FROM up
+            INNER JOIN mr ON up.customer_id = mr.customer_id
+            WHERE up.amount_spent > 0;
     """
 
     run_job_bigquery = BigQueryInsertJobOperator(
@@ -197,4 +214,4 @@ with DAG(
 
 
     create_bucket >> upload_movie_review_to_gcs >> user_purchase_mysql_to_gcs  >>  create_dataproc_cluster >> pyspark_clean_to_gcs >> delete_cluster
-    delete_cluster >> create_movies_dataset >> [movie_review_from_gcs_to_bigquery, user_purchase_from_gcs_to_bigquery] >> run_job_bigquery
+    delete_cluster >> create_movie_dataset >> [movie_review_from_gcs_to_bigquery, user_purchase_from_gcs_to_bigquery] >> run_job_bigquery
