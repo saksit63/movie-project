@@ -1,6 +1,6 @@
 # End-to-End Movie ETL Pipeline
 
-Technology used: *Python, PySpark, Apache Airflow, Docker,Google Cloud Dataproc, Google Cloud Storage, Google Cloud Bigquery, Google Looker Studio*
+Technology used: *Python, PySpark, Apache Airflow, Docker,Google Cloud Dataproc, Google Cloud Storage, Google Cloud Bigquery, Power BI*
 
 ![Data Pipeline Diagram](https://github.com/saksit63/movie-project/blob/main/img/movie_workflow.png)
 
