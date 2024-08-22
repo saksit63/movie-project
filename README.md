@@ -14,9 +14,7 @@ Airflow:
 
 ![Airlofw](https://github.com/saksit63/movie-project/blob/main/result/airflow_dag.png)
 
-Bigquery:
 
-![Bigquery](https://github.com/saksit63/movie-project/blob/main/result/bigquery.png)
 
 Dashbord: 
 
